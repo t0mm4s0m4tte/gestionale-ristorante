@@ -195,7 +195,7 @@
         <div class="modal-content" style="max-width: 400px;">
             <h3 id="optionsModalTitle" style="margin-bottom:1rem; color:var(--primary-color);">Opzioni Piatto</h3>
             
-            <div id="cookingLevelSection" style="display:none; text-align: left; margin-bottom: 1.5rem;">
+            <div id="cookingLevelSection" style="display:none; text-align: left; margin-bottom: 1rem;">
                 <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Cottura della carne</h4>
                 <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                     <label class="radio-btn" style="display:none;"><input type="radio" name="cookingLevel" value="Non applicabile" checked> Nessuna</label>
@@ -205,7 +205,7 @@
                 </div>
             </div>
 
-            <div id="sideDishSection" style="text-align: left; margin-bottom: 1.5rem;">
+            <div id="sideDishSection" style="display:none; text-align: left; margin-bottom: 1rem;">
                 <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Contorno</h4>
                 <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
                     <label class="radio-btn"><input type="radio" name="sideDish" value="Nessun contorno" checked> Nessun contorno</label>
@@ -217,9 +217,64 @@
                 </div>
             </div>
 
+            <div id="pizzaCookingSection" style="display:none; text-align: left; margin-bottom: 1rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Cottura Pizza</h4>
+                <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label class="radio-btn"><input type="radio" name="pizzaCooking" value="Normale" checked> Normale</label>
+                    <label class="radio-btn"><input type="radio" name="pizzaCooking" value="Ben cotta"> Ben cotta</label>
+                </div>
+            </div>
+
+            <div id="pizzaEdgeSection" style="display:none; text-align: left; margin-bottom: 1rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Bordo Pizza</h4>
+                <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label class="radio-btn"><input type="radio" name="pizzaEdge" value="Bordo classico" checked> Bordo classico</label>
+                    <label class="radio-btn"><input type="radio" name="pizzaEdge" value="Bordo basso"> Bordo basso</label>
+                </div>
+            </div>
+
+            <div id="extraIngredientsSection" style="display:none; text-align: left; margin-bottom: 1rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Ingredienti Extra / Variazioni</h4>
+                <input type="text" id="extraIngredientsInput" placeholder="es. doppia mozzarella, senza cipolla..." style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+            </div>
+
+            <div id="notesSection" style="display:block; text-align: left; margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Note per Cucina / Bar</h4>
+                <input type="text" id="itemNotesInput" placeholder="es. senza ghiaccio, da dividere..." style="width: 100%; padding: 0.8rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+            </div>
+
             <div style="display:flex; gap:10px;">
                 <button id="cancelOptionsBtn" class="btn secondary full-width">Annulla</button>
                 <button id="confirmOptionsBtn" class="btn primary full-width">Aggiungi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Nuova Prenotazione -->
+    <div id="reservationFormModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 400px; text-align: left;">
+            <h3 style="margin-bottom:1rem; color:var(--primary-color);">Nuova Prenotazione</h3>
+            
+            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Orario</label>
+            <input type="time" id="resTimeInput" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+
+            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Nome Cliente</label>
+            <input type="text" id="resNameInput" placeholder="es. Mario Rossi" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+
+            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Telefono</label>
+            <input type="tel" id="resPhoneInput" placeholder="es. 3331234567" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+
+            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Coperti</label>
+            <input type="number" id="resPaxInput" value="2" min="1" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+
+            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Tavolo Assegnato</label>
+            <select id="resTableSelect" style="width: 100%; padding: 0.8rem; margin-bottom: 1.5rem; border-radius: 8px; border: 1px solid #CBD5E1; background: white;">
+                <!-- Popolato dinamicamente -->
+            </select>
+
+            <div style="display:flex; gap:10px;">
+                <button id="cancelResBtn" class="btn secondary full-width">Annulla</button>
+                <button id="saveResBtn" class="btn primary full-width">Salva</button>
             </div>
         </div>
     </div>

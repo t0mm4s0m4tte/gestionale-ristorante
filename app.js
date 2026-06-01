@@ -313,15 +313,31 @@ let pendingTableId = null;
 function openTable(tableId) {
     let table = globalData.tables.find(t => t.id === tableId);
     
-    if (table.status === 'LIBERO' || table.status === 'PRENOTATO') {
+    if (table.status === 'LIBERO') {
         pendingTableId = tableId;
-        const isPrenotato = table.status === 'PRENOTATO';
-        document.getElementById('partySizeInput').value = isPrenotato && globalData.orders && globalData.orders[tableId] ? (globalData.orders[tableId].partySize || 2) : 2; 
+        document.getElementById('partySizeInput').value = 2;
+        document.getElementById('partyArrivedCheckbox').checked = true; // Auto check for walk-ins
+        document.getElementById('partyArrivedCheckbox').parentElement.style.display = 'none'; // Hide it
+        document.getElementById('partySizeModal').style.display = 'flex';
+    } else if (table.status === 'PRENOTATO') {
+        pendingTableId = tableId;
+        if (!globalData.reservations) globalData.reservations = [];
+        const sortedRes = [...globalData.reservations].sort((a, b) => a.time.localeCompare(b.time));
+        const nextRes = sortedRes.find(r => r.tableId === tableId && r.status === 'PENDING');
+        
+        if (nextRes) {
+            document.getElementById('partySizeInput').value = nextRes.pax;
+            document.getElementById('partyArrivedLabelText').textContent = ` ${nextRes.name} (${nextRes.time}) è arrivato? (Occupa tavolo)`;
+        } else {
+            document.getElementById('partySizeInput').value = 2;
+            document.getElementById('partyArrivedLabelText').textContent = ' Occupare tavolo?';
+        }
         document.getElementById('partyArrivedCheckbox').checked = false;
-        document.getElementById('partyArrivedLabelText').textContent = isPrenotato ? ' I clienti sono arrivati (occupa tavolo)' : ' Non erano prenotati (accomoda subito)';
+        document.getElementById('partyArrivedCheckbox').parentElement.style.display = 'block'; 
+        
         document.getElementById('partySizeModal').style.display = 'flex';
     } else {
-        // Apre direttamente il tavolo (già occupato)
+        // OCCUPATO
         activeTableId = tableId;
         showScreen('order');
         renderOrderScreen();
@@ -351,17 +367,21 @@ document.getElementById('confirmPartySizeBtn').addEventListener('click', () => {
 
         if (isArrived) {
             table.status = 'OCCUPATO';
+            
+            if (!globalData.reservations) globalData.reservations = [];
+            const sortedRes = [...globalData.reservations].sort((a, b) => a.time.localeCompare(b.time));
+            const nextRes = sortedRes.find(r => r.tableId === pendingTableId && r.status === 'PENDING');
+            if (nextRes) {
+                nextRes.status = 'SEATED';
+            }
+            
             db.set(globalData);
             activeTableId = pendingTableId;
             pendingTableId = null;
             showScreen('order');
             renderOrderScreen();
         } else {
-            table.status = 'PRENOTATO';
-            db.set(globalData);
             pendingTableId = null;
-            showScreen('dashboard');
-            renderTables();
         }
     }
 });
@@ -450,6 +470,88 @@ function renderOrderScreen() {
             }
         };
 
+        window.editOrderItem = function(identifier) {
+            if (!activeTableId || !globalData.orders[activeTableId]) return;
+            const ord = globalData.orders[activeTableId];
+            const item = ord.items.find(i => (i.uniqueLineId || String(i.id)) === String(identifier));
+            if (!item) return;
+
+            const menuItem = globalData.menu.find(m => m.id === item.id);
+            if (!menuItem) return;
+
+            pendingMenuItemIdForOptions = item.id;
+            pendingEditItemIdentifier = identifier;
+            document.getElementById('optionsModalTitle').textContent = "Modifica: " + item.name;
+
+            const cat = menuItem.category || '';
+            const isPizza = ['Pizze rosse', 'Pizze bianche', 'Pizze al tegamino', 'Pizze Baby'].includes(cat);
+            const allowsExtra = isPizza || ['Focacce', 'Hamburger', 'Panuozzi', 'Calzoni'].includes(cat);
+
+            // Reset all
+            document.getElementById('cookingLevelSection').style.display = 'none';
+            document.getElementById('sideDishSection').style.display = 'none';
+            document.getElementById('pizzaCookingSection').style.display = 'none';
+            document.getElementById('pizzaEdgeSection').style.display = 'none';
+            document.getElementById('extraIngredientsSection').style.display = 'none';
+            document.getElementById('extraIngredientsInput').value = '';
+            document.getElementById('itemNotesInput').value = '';
+            
+            document.querySelector('input[name="cookingLevel"][value="Non applicabile"]').checked = true;
+            document.querySelector('input[name="sideDish"][value="Nessun contorno"]').checked = true;
+            document.querySelector('input[name="pizzaCooking"][value="Normale"]').checked = true;
+            document.querySelector('input[name="pizzaEdge"][value="Bordo classico"]').checked = true;
+
+            // Show sections based on category
+            if (cat === 'Secondi di terra' || cat === 'Secondi di mare') {
+                const nameLower = menuItem.name.toLowerCase();
+                const requiresCooking = nameLower.includes('filetto') || nameLower.includes('tagliata') || nameLower.includes('costata') || nameLower.includes('entrecôte') || nameLower.includes('entrecote') || nameLower.includes('grigliata mista');
+                document.getElementById('cookingLevelSection').style.display = requiresCooking ? 'block' : 'none';
+                document.getElementById('sideDishSection').style.display = 'block';
+            }
+            if (isPizza) {
+                document.getElementById('pizzaCookingSection').style.display = 'block';
+                document.getElementById('pizzaEdgeSection').style.display = 'block';
+            }
+            if (allowsExtra) {
+                document.getElementById('extraIngredientsSection').style.display = 'block';
+            }
+
+            // Load values from item.variants
+            if (item.variants) {
+                item.variants.forEach(v => {
+                    if (v.startsWith('Cottura: ')) {
+                        const val = v.replace('Cottura: ', '');
+                        if (['Normale', 'Ben cotta'].includes(val)) {
+                            const rb = document.querySelector(`input[name="pizzaCooking"][value="${val}"]`);
+                            if(rb) rb.checked = true;
+                        } else {
+                            const rb = document.querySelector(`input[name="cookingLevel"][value="${val}"]`);
+                            if(rb) rb.checked = true;
+                        }
+                    }
+                    if (v.startsWith('Contorno: ')) {
+                        let val = v.replace('Contorno: ', '');
+                        if (val.includes('Verdure grigliate')) val = 'Verdure grigliate (+2,50€)';
+                        const rb = document.querySelector(`input[name="sideDish"][value="${val}"]`);
+                        if(rb) rb.checked = true;
+                    }
+                    if (v.startsWith('Bordo: ')) {
+                        const val = v.replace('Bordo: ', '');
+                        const rb = document.querySelector(`input[name="pizzaEdge"][value="${val}"]`);
+                        if(rb) rb.checked = true;
+                    }
+                    if (v.startsWith('Extra: ')) {
+                        document.getElementById('extraIngredientsInput').value = v.replace('Extra: ', '');
+                    }
+                    if (v.startsWith('Note: ')) {
+                        document.getElementById('itemNotesInput').value = v.replace('Note: ', '');
+                    }
+                });
+            }
+
+            document.getElementById('itemOptionsModal').style.display = 'flex';
+        };
+
         [1, 2, 3].forEach(courseNum => {
             const courseItems = order.items.filter(i => (i.course || 1) === courseNum);
             
@@ -479,14 +581,15 @@ function renderOrderScreen() {
                     li.style.flexDirection = 'column';
                     
                     const variantsHtml = (item.variants && item.variants.length > 0) ? `<br><small style="color:#64748B;">${item.variants.join(' | ')}</small>` : '';
-                    const identifier = item.uniqueLineId || item.id;
+                    const identifier = String(item.uniqueLineId || item.id);
+                    const safeIdentifier = identifier.replace(/'/g, "\\'");
                     
                     li.innerHTML = `
                         <div style="display:flex; justify-content:space-between; width:100%; align-items:flex-start;">
-                            <div style="display:flex; align-items:flex-start; gap:0.5rem;">
-                                <button class="btn danger small" style="padding:0.1rem 0.5rem; font-size:1.2rem; border-radius:4px; margin-top:0.2rem;" onclick="decreaseItemQuantity('${identifier}')">-</button>
+                            <div style="display:flex; align-items:flex-start; gap:0.5rem; flex:1; cursor:pointer;" onclick="editOrderItem('${safeIdentifier}')">
+                                <button class="btn danger small" style="padding:0.1rem 0.5rem; font-size:1.2rem; border-radius:4px; margin-top:0.2rem;" onclick="event.stopPropagation(); decreaseItemQuantity('${safeIdentifier}')">-</button>
                                 <div>
-                                    <span style="font-weight:600;">${item.quantity}x ${item.name}</span>
+                                    <span style="font-weight:600;">${item.quantity}x ${item.name} <span style="font-size:0.8rem; margin-left:0.3rem;">✏️</span></span>
                                     ${variantsHtml}
                                 </div>
                             </div>
@@ -555,38 +658,79 @@ function renderOrderScreen() {
 }
 
 let pendingMenuItemIdForOptions = null;
+let pendingEditItemIdentifier = null;
 
 function handleAddBtnClick(menuItemId) {
     const menuItem = globalData.menu.find(m => m.id === menuItemId);
     if (!menuItem) return;
     
-    if (menuItem.category === 'Secondi di terra' || menuItem.category === 'Secondi di mare') {
-        pendingMenuItemIdForOptions = menuItemId;
-        document.getElementById('optionsModalTitle').textContent = menuItem.name;
-        
-        const nameLower = menuItem.name.toLowerCase();
-        const requiresCooking = nameLower.includes('filetto') || 
-                                nameLower.includes('tagliata') || 
-                                nameLower.includes('costata') || 
-                                nameLower.includes('entrecôte') || 
-                                nameLower.includes('entrecote') || 
-                                nameLower.includes('grigliata mista');
-
-        if (requiresCooking) {
-            document.getElementById('cookingLevelSection').style.display = 'block';
-            document.querySelector('input[name="cookingLevel"][value="Media"]').checked = true;
-        } else {
-            document.getElementById('cookingLevelSection').style.display = 'none';
-            document.querySelector('input[name="cookingLevel"][value="Non applicabile"]').checked = true;
-        }
-        
-        // Reset radios
-        document.querySelector('input[name="sideDish"][value="Nessun contorno"]').checked = true;
-        
-        document.getElementById('itemOptionsModal').style.display = 'flex';
-    } else {
-        addMenuItemToOrder(menuItemId, null, null);
+    const cat = menuItem.category || '';
+    const nameLower = menuItem.name.toLowerCase();
+    
+    const isPizza = ['Pizze rosse', 'Pizze bianche', 'Pizze al tegamino', 'Pizze Baby'].includes(cat);
+    const allowsExtra = isPizza || ['Focacce', 'Hamburger', 'Panuozzi', 'Calzoni'].includes(cat);
+    const isSecondo = cat === 'Secondi di terra' || cat === 'Secondi di mare';
+    
+    // Se è un piatto semplice (es. Bibite, Primi), aggiungi subito senza aprire il popup
+    if (!isPizza && !allowsExtra && !isSecondo) {
+        addMenuItemToOrder(menuItemId, [], 0);
+        return;
     }
+    
+    pendingMenuItemIdForOptions = menuItemId;
+    pendingEditItemIdentifier = null; // Nuova variabile per tracciare la modifica
+    document.getElementById('optionsModalTitle').textContent = menuItem.name;
+    
+    // Reset inputs
+    document.getElementById('extraIngredientsInput').value = '';
+    document.getElementById('itemNotesInput').value = '';
+    
+    // Secondi: Cottura e Contorni
+    if (cat === 'Secondi di terra' || cat === 'Secondi di mare') {
+        const requiresCooking = nameLower.includes('filetto') || nameLower.includes('tagliata') || nameLower.includes('costata') || nameLower.includes('entrecôte') || nameLower.includes('entrecote') || nameLower.includes('grigliata mista');
+        document.getElementById('cookingLevelSection').style.display = requiresCooking ? 'block' : 'none';
+        document.querySelector(`input[name="cookingLevel"][value="${requiresCooking ? 'Media' : 'Non applicabile'}"]`).checked = true;
+        
+        document.getElementById('sideDishSection').style.display = 'block';
+        document.querySelector('input[name="sideDish"][value="Nessun contorno"]').checked = true;
+    } else {
+        document.getElementById('cookingLevelSection').style.display = 'none';
+        document.getElementById('sideDishSection').style.display = 'none';
+        document.querySelector('input[name="cookingLevel"][value="Non applicabile"]').checked = true;
+        document.querySelector('input[name="sideDish"][value="Nessun contorno"]').checked = true;
+    }
+
+    // Pizze: Cottura Pizza e Bordo
+    const isPizza = ['Pizze rosse', 'Pizze bianche', 'Pizze al tegamino', 'Pizze Baby'].includes(cat);
+    if (isPizza) {
+        document.getElementById('pizzaCookingSection').style.display = 'block';
+        document.getElementById('pizzaEdgeSection').style.display = 'block';
+        document.querySelector('input[name="pizzaCooking"][value="Normale"]').checked = true;
+        document.querySelector('input[name="pizzaEdge"][value="Bordo classico"]').checked = true;
+    } else {
+        document.getElementById('pizzaCookingSection').style.display = 'none';
+        document.getElementById('pizzaEdgeSection').style.display = 'none';
+    }
+
+    // Ingredienti Extra: Pizze, Focacce, Hamburger, Panuozzi, Calzoni
+    const allowsExtra = isPizza || ['Focacce', 'Hamburger', 'Panuozzi', 'Calzoni'].includes(cat);
+    if (allowsExtra) {
+        document.getElementById('extraIngredientsSection').style.display = 'block';
+    } else {
+        document.getElementById('extraIngredientsSection').style.display = 'none';
+    }
+    
+    // Mostra Modal per tutti
+    document.getElementById('itemOptionsModal').style.display = 'flex';
+    
+    // Focus sul campo note o ingredienti per velocizzare l'inserimento
+    setTimeout(() => {
+        if (allowsExtra) {
+            document.getElementById('extraIngredientsInput').focus();
+        } else {
+            document.getElementById('itemNotesInput').focus();
+        }
+    }, 50);
 }
 
 const cancelOptionsBtn = document.getElementById('cancelOptionsBtn');
@@ -594,6 +738,7 @@ if(cancelOptionsBtn) {
     cancelOptionsBtn.addEventListener('click', () => {
         document.getElementById('itemOptionsModal').style.display = 'none';
         pendingMenuItemIdForOptions = null;
+        pendingEditItemIdentifier = null;
     });
 }
 
@@ -602,36 +747,77 @@ if(confirmOptionsBtn) {
     confirmOptionsBtn.addEventListener('click', () => {
         if (!pendingMenuItemIdForOptions) return;
         
-        const cookingLevel = document.querySelector('input[name="cookingLevel"]:checked').value;
-        const sideDish = document.querySelector('input[name="sideDish"]:checked').value;
+        const menuItem = globalData.menu.find(m => m.id === pendingMenuItemIdForOptions);
+        if (!menuItem) return;
         
-        addMenuItemToOrder(pendingMenuItemIdForOptions, cookingLevel, sideDish);
+        const cat = menuItem.category || '';
+        const isPizza = ['Pizze rosse', 'Pizze bianche', 'Pizze al tegamino', 'Pizze Baby'].includes(cat);
+        const allowsExtra = isPizza || ['Focacce', 'Hamburger', 'Panuozzi', 'Calzoni'].includes(cat);
+        
+        let variants = [];
+        let extraPrice = 0;
+        
+        // Secondi
+        if (cat === 'Secondi di terra' || cat === 'Secondi di mare') {
+            const cookingLevel = document.querySelector('input[name="cookingLevel"]:checked').value;
+            if (cookingLevel !== 'Non applicabile') variants.push(`Cottura: ${cookingLevel}`);
+            
+            const sideDish = document.querySelector('input[name="sideDish"]:checked').value;
+            if (sideDish !== 'Nessun contorno') {
+                if (sideDish.startsWith('Verdure grigliate')) {
+                    variants.push(`Contorno: Verdure grigliate (+2,50€)`);
+                    extraPrice += 2.50;
+                } else {
+                    variants.push(`Contorno: ${sideDish}`);
+                }
+            }
+        }
+        
+        // Pizze
+        if (isPizza) {
+            const pCooking = document.querySelector('input[name="pizzaCooking"]:checked').value;
+            if (pCooking !== 'Normale') variants.push(`Cottura: ${pCooking}`);
+            
+            const pEdge = document.querySelector('input[name="pizzaEdge"]:checked').value;
+            if (pEdge !== 'Bordo classico') variants.push(`Bordo: ${pEdge}`);
+        }
+        
+        // Extra Ingredients
+        if (allowsExtra) {
+            const extraIng = document.getElementById('extraIngredientsInput').value.trim();
+            if (extraIng) variants.push(`Extra: ${extraIng}`);
+        }
+        
+        // Notes
+        const notes = document.getElementById('itemNotesInput').value.trim();
+        if (notes) variants.push(`Note: ${notes}`);
+        
+        if (pendingEditItemIdentifier) {
+            const order = globalData.orders[activeTableId];
+            if (order && order.items) {
+                const index = order.items.findIndex(i => (i.uniqueLineId || String(i.id)) === String(pendingEditItemIdentifier));
+                if (index !== -1) {
+                    order.items[index].variants = variants;
+                    order.items[index].uniqueLineId = menuItem.id + '-' + variants.join('-');
+                    db.set(globalData);
+                    renderOrderScreen();
+                }
+            }
+        } else {
+            addMenuItemToOrder(pendingMenuItemIdForOptions, variants, extraPrice);
+        }
         
         document.getElementById('itemOptionsModal').style.display = 'none';
         pendingMenuItemIdForOptions = null;
+        pendingEditItemIdentifier = null;
     });
 }
 
-function addMenuItemToOrder(menuItemId, cookingLevel = null, sideDish = null) {
+function addMenuItemToOrder(menuItemId, variantsText = [], extraPrice = 0) {
     const menuItem = globalData.menu.find(m => m.id === menuItemId);
     const order = globalData.orders[activeTableId];
     
     if (!order.items) order.items = [];
-    
-    // Costruisci varianti e ID univoco riga
-    let variantsText = [];
-    let extraPrice = 0;
-    if (cookingLevel && cookingLevel !== 'Non applicabile') {
-        variantsText.push(`Cottura: ${cookingLevel}`);
-    }
-    if (sideDish && sideDish !== 'Nessun contorno') {
-        if (sideDish.startsWith('Verdure grigliate')) {
-            variantsText.push(`Contorno: Verdure grigliate (+2,50€)`);
-            extraPrice = 2.50;
-        } else {
-            variantsText.push(`Contorno: ${sideDish}`);
-        }
-    }
     
     const uniqueLineId = menuItem.id + '-' + variantsText.join('-');
     
@@ -683,15 +869,125 @@ function addMenuItemToOrder(menuItemId, cookingLevel = null, sideDish = null) {
 // --- CHIUSURA CONTO ---
 document.getElementById('closeOrderBtn').addEventListener('click', () => {
     let table = globalData.tables.find(t => t.id === activeTableId);
-    table.status = 'LIBERO'; // Libera il tavolo
+    
+    if(!globalData.reservations) globalData.reservations = [];
+    const hasNext = globalData.reservations.some(r => r.tableId === table.id && r.status === 'PENDING');
+    
+    table.status = hasNext ? 'PRENOTATO' : 'LIBERO';
+    
     delete globalData.orders[activeTableId]; // Elimina l'ordine chiuso
     db.set(globalData);
     
-    activeTableId = null;
     showScreen('dashboard');
+    renderTables();
 });
 
+// --- GESTIONE PRENOTAZIONI AVANZATA ---
+if (!globalData.reservations) globalData.reservations = [];
 
+function renderReservations() {
+    if (!globalData.reservations) globalData.reservations = [];
+    const list = document.getElementById('reservationsList');
+    if(!list) return;
+    list.innerHTML = '';
+    
+    const sorted = [...globalData.reservations].sort((a, b) => a.time.localeCompare(b.time));
+    
+    if (sorted.length === 0) {
+        list.innerHTML = '<p style="color:var(--text-secondary); text-align:center;">Nessuna prenotazione presente.</p>';
+        return;
+    }
+    
+    sorted.forEach(res => {
+        const table = globalData.tables.find(t => t.id === res.tableId);
+        const tableNome = table ? `Tavolo ${table.number}` : `Tavolo N/D`;
+        
+        const card = document.createElement('div');
+        card.className = `reservation-card ${res.status === 'SEATED' ? 'seated' : ''}`;
+        
+        card.innerHTML = `
+            <div class="reservation-header">
+                <span>🕒 ${res.time} - 👤 ${res.name}</span>
+                <span>${tableNome}</span>
+            </div>
+            <div class="reservation-details">
+                <span>📞 ${res.phone || 'Nessun numero'} | 👥 ${res.pax} persone</span>
+                <span style="color: ${res.status === 'SEATED' ? 'var(--success-color)' : 'var(--warning-color)'}; font-weight: bold;">
+                    ${res.status === 'SEATED' ? 'Arrivato e Seduto' : 'In attesa'}
+                </span>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+document.getElementById('viewReservationsBtn').addEventListener('click', () => {
+    showScreen('reservations');
+    renderReservations();
+});
+
+document.getElementById('backToDashboardFromResBtn').addEventListener('click', () => {
+    showScreen('dashboard');
+    renderTables();
+});
+
+document.getElementById('addReservationBtn').addEventListener('click', () => {
+    const select = document.getElementById('resTableSelect');
+    if(select) {
+        select.innerHTML = '';
+        globalData.tables.filter(t => t.active).forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            opt.textContent = `Tavolo ${t.number}`;
+            select.appendChild(opt);
+        });
+    }
+    
+    document.getElementById('resTimeInput').value = '20:00';
+    document.getElementById('resNameInput').value = '';
+    document.getElementById('resPhoneInput').value = '';
+    document.getElementById('resPaxInput').value = '2';
+    
+    document.getElementById('reservationFormModal').style.display = 'flex';
+});
+
+document.getElementById('cancelResBtn').addEventListener('click', () => {
+    document.getElementById('reservationFormModal').style.display = 'none';
+});
+
+document.getElementById('saveResBtn').addEventListener('click', () => {
+    const time = document.getElementById('resTimeInput').value;
+    const name = document.getElementById('resNameInput').value.trim();
+    const phone = document.getElementById('resPhoneInput').value.trim();
+    const pax = parseInt(document.getElementById('resPaxInput').value) || 2;
+    const tableId = parseInt(document.getElementById('resTableSelect').value);
+    
+    if (!time || !name) {
+        alert("Inserisci orario e nome del cliente.");
+        return;
+    }
+    
+    if (!globalData.reservations) globalData.reservations = [];
+    
+    globalData.reservations.push({
+        id: Date.now(),
+        time,
+        name,
+        phone,
+        pax,
+        tableId,
+        status: 'PENDING'
+    });
+    
+    const table = globalData.tables.find(t => t.id === tableId);
+    if (table && table.status === 'LIBERO') {
+        table.status = 'PRENOTATO';
+    }
+    
+    db.set(globalData);
+    document.getElementById('reservationFormModal').style.display = 'none';
+    renderReservations();
+});
 
 // --- NAVIGAZIONE BACK ---
 document.getElementById('backToDashboardBtn').addEventListener('click', () => {
