@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Restaurant Web App</title>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Schermata di Login / PIN -->
+    <div id="loginScreen" class="screen active">
+        <div class="login-container">
+            <h1>Accesso Riservato</h1>
+            <p>Inserisci il PIN per accedere all'app del ristorante.</p>
+            <input type="password" id="pinInput" placeholder="PIN" maxlength="4" />
+            <button id="loginBtn" class="btn primary">Entra</button>
+            <p id="loginError" class="error-msg"></p>
+        </div>
+    </div>
+
+    <!-- Schermata Principale (Dashboard Tavoli) -->
+    <div id="dashboardScreen" class="screen">
+        <header>
+            <h1>Gestione Tavoli</h1>
+            <div style="display:flex; gap:10px;">
+                <button id="manageMenuBtn" class="btn secondary small">Menù</button>
+                <button id="settingsBtn" class="btn icon">⚙️</button>
+                <button id="logoutBtn" class="btn secondary small">Esci</button>
+            </div>
+        </header>
+
+        <div class="tabs">
+            <button class="tab active" data-zone="SALA_GRANDE">Sala Grande</button>
+            <button class="tab" data-zone="SALA_PICCOLA">Sala Piccola</button>
+            <button class="tab" data-zone="DEHOR">Dehor</button>
+        </div>
+
+        <div id="tablesGrid" class="tables-grid">
+            <!-- I tavoli verranno generati dinamicamente qui -->
+        </div>
+        
+        <button id="viewReservationsBtn" class="btn fab">Prenotazioni</button>
+    </div>
+
+    <!-- Schermata della Comanda (Ordine) -->
+    <div id="orderScreen" class="screen">
+        <header>
+            <button id="backToDashboardBtn" class="btn icon">←</button>
+            <h1 id="orderTitle">Tavolo X</h1>
+            <div class="header-spacer"></div>
+        </header>
+
+        <div class="order-summary">
+            <h3>Riepilogo Ordine</h3>
+            <ul id="orderItemsList" class="order-list">
+                <!-- Voci ordine dinamiche -->
+            </ul>
+            <div class="order-total">
+                <span>Totale:</span>
+                <span id="orderTotalAmount">€0.00</span>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:15px;">
+                <button id="closeOrderBtn" class="btn primary full-width">Paga / Libera</button>
+            </div>
+        </div>
+
+        <div class="menu-section">
+            <h3>Aggiungi al Conto</h3>
+            <div id="menuItemsList" class="menu-list">
+                <!-- Menu dinamico -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Schermata Prenotazioni -->
+    <div id="reservationsScreen" class="screen">
+         <header>
+            <button id="backToDashboardFromResBtn" class="btn icon">←</button>
+            <h1>Prenotazioni</h1>
+            <button id="addReservationBtn" class="btn primary small">+ Nuova</button>
+        </header>
+        <div id="reservationsList" class="reservations-list">
+             <!-- Prenotazioni dinamiche -->
+        </div>
+    </div>
+
+    <!-- Schermata Admin / Impostazioni Tavoli -->
+    <div id="adminScreen" class="screen">
+        <header>
+            <button id="backToDashboardFromAdminBtn" class="btn icon">←</button>
+            <h1>Impostazioni Tavoli</h1>
+            <div class="header-spacer"></div>
+        </header>
+        <div class="admin-content">
+            <p>Seleziona i tavoli che desideri attivare per questo servizio. Solo i tavoli selezionati appariranno nella dashboard principale.</p>
+            <div id="adminTablesContainer">
+                <!-- Generati dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Schermata Gestione Menù -->
+    <div id="menuScreen" class="screen">
+        <header>
+            <button id="backToDashboardFromMenuBtn" class="btn icon">←</button>
+            <h1>Gestione Menù</h1>
+            <button id="openAddMenuItemModalBtn" class="btn primary small">+ Piatto</button>
+        </header>
+        <div class="menu-admin-tabs tabs">
+            <button class="tab active" data-category="CUCINA">Cucina</button>
+            <button class="tab" data-category="PIZZERIA">Pizzeria</button>
+            <button class="tab" data-category="BEVANDE">Bevande</button>
+        </div>
+        <div class="menu-admin-content" id="menuAdminContainer">
+            <!-- Piatti generati dinamicamente -->
+        </div>
+    </div>
+
+    <!-- Modal Numero Coperti -->
+    <div id="partySizeModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>Quante persone?</h3>
+            <p>Inserisci il numero di coperti per questo tavolo.</p>
+            <input type="number" id="partySizeInput" min="1" max="20" value="2" />
+            <div style="margin-top: 1rem; text-align: left;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; cursor: pointer;">
+                    <input type="checkbox" id="partyArrivedCheckbox" style="width: 20px; height: 20px;" />
+                    <span id="partyArrivedLabelText">I clienti sono arrivati</span>
+                </label>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:1rem;">
+                <button id="cancelPartySizeBtn" class="btn secondary full-width">Annulla</button>
+                <button id="confirmPartySizeBtn" class="btn primary full-width">Conferma</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Aggiungi/Modifica Piatto -->
+    <div id="addMenuItemModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="menuItemModalTitle">Nuovo Piatto</h3>
+            <div class="form-group">
+                <input type="text" id="newMenuItemName" placeholder="Nome (es. Fritto Misto)" />
+                <input type="number" id="newMenuItemPrice" placeholder="Prezzo (es. 12.50)" step="0.5" min="0" />
+                <select id="newMenuItemCategory">
+                    <option value="Antipasti di terra">Antipasti di terra</option>
+                    <option value="Antipasti di mare">Antipasti di mare</option>
+                    <option value="Taglieri Speciali">Taglieri Speciali</option>
+                    <option value="Primi di terra">Primi di terra</option>
+                    <option value="Primi di mare">Primi di mare</option>
+                    <option value="Gnocchi della casa">Gnocchi della casa</option>
+                    <option value="Secondi di terra">Secondi di terra</option>
+                    <option value="Secondi di mare">Secondi di mare</option>
+                    <option value="Insalate">Insalate</option>
+                    <option value="Hamburger">Hamburger</option>
+                    <option value="Pizze rosse">Pizze rosse</option>
+                    <option value="Pizze bianche">Pizze bianche</option>
+                    <option value="Pizze al tegamino">Pizze al tegamino</option>
+                    <option value="Pizze Baby">Pizze Baby</option>
+                    <option value="Focacce">Focacce</option>
+                    <option value="Panuozzi">Panuozzi</option>
+                    <option value="Calzoni">Calzoni</option>
+                    <option value="Bibite varie">Bibite varie</option>
+                    <option value="Birre alla spina">Birre alla spina</option>
+                    <option value="Birre in bottiglia">Birre in bottiglia</option>
+                    <option value="Vini alla spina">Vini alla spina</option>
+                    <option value="Vini bianchi">Vini bianchi</option>
+                    <option value="Vini rossi">Vini rossi</option>
+                    <option value="Bollicine">Bollicine</option>
+                    <option value="Alcolici">Alcolici</option>
+                    <option value="Caffè">Caffè</option>
+                    <option value="Amari">Amari</option>
+                    <option value="Varie">Varie</option>
+                </select>
+            </div>
+            <div style="margin-top: 1rem;">
+                <label>Ingredienti / Descrizione (Opzionale)</label>
+                <textarea id="menuItemIngredients" rows="2" style="width:100%; padding: 0.5rem; border: 1px solid #CBD5E1; border-radius: 0.25rem; font-family: inherit; resize: vertical;" placeholder="Es. Pomodoro, mozzarella, basilico..."></textarea>
+            </div>
+            <div style="margin-top: 1rem; display: flex; align-items: center; gap: 0.5rem;">
+                <input type="checkbox" id="menuItemActive" style="width: 1.2rem; height: 1.2rem; cursor: pointer;">
+                <label for="menuItemActive" style="cursor: pointer; margin: 0; font-weight: bold; color: #10B981;">Piatto Attivo (Visibile in comanda)</label>
+            </div>
+            <div style="display:flex; gap:10px; margin-top:1rem;">
+                <button id="cancelAddMenuItemBtn" class="btn secondary full-width">Annulla</button>
+                <button id="confirmAddMenuItemBtn" class="btn primary full-width">Salva</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Variante Piatto (Cottura / Contorno) -->
+    <div id="itemOptionsModal" class="modal-overlay" style="display:none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 id="optionsModalTitle" style="margin-bottom:1rem; color:var(--primary-color);">Opzioni Piatto</h3>
+            
+            <div id="cookingLevelSection" style="display:none; text-align: left; margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Cottura della carne</h4>
+                <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label class="radio-btn" style="display:none;"><input type="radio" name="cookingLevel" value="Non applicabile" checked> Nessuna</label>
+                    <label class="radio-btn"><input type="radio" name="cookingLevel" value="Al sangue"> Al sangue</label>
+                    <label class="radio-btn"><input type="radio" name="cookingLevel" value="Media"> Media</label>
+                    <label class="radio-btn"><input type="radio" name="cookingLevel" value="Ben cotta"> Ben cotta</label>
+                </div>
+            </div>
+
+            <div id="sideDishSection" style="text-align: left; margin-bottom: 1.5rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem;">Contorno</h4>
+                <div class="radio-group" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label class="radio-btn"><input type="radio" name="sideDish" value="Nessun contorno" checked> Nessun contorno</label>
+                    <label class="radio-btn"><input type="radio" name="sideDish" value="Patate al forno"> Patate al forno</label>
+                    <label class="radio-btn"><input type="radio" name="sideDish" value="Patate fritte"> Patate fritte</label>
+                    <label class="radio-btn"><input type="radio" name="sideDish" value="Insalata verde"> Insalata verde</label>
+                    <label class="radio-btn"><input type="radio" name="sideDish" value="Insalata mista"> Insalata mista</label>
+                    <label class="radio-btn"><input type="radio" name="sideDish" value="Verdure grigliate (+2,50€)"> Verdure grigliate <br> <span style="font-size:0.8rem; color:var(--primary-color);">+2,50€</span></label>
+                </div>
+            </div>
+
+            <div style="display:flex; gap:10px;">
+                <button id="cancelOptionsBtn" class="btn secondary full-width">Annulla</button>
+                <button id="confirmOptionsBtn" class="btn primary full-width">Aggiungi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="firebase-config.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
