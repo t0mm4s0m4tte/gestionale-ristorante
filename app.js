@@ -1,17 +1,15 @@
 // --- STATO GLOBALE ---
-const SECRET_PIN = "1234"; // Sostituisci con la vera password del ristorante
 let currentZone = 'SALA_GRANDE';
 let activeTableId = null;
 let globalData = null;
 
 // --- GESTIONE UI SCHERMATE ---
 const screens = {
-    login: document.getElementById('loginScreen'),
     dashboard: document.getElementById('dashboardScreen'),
     order: document.getElementById('orderScreen'),
-    reservations: document.getElementById('reservationsScreen'),
     admin: document.getElementById('adminScreen'),
-    menu: document.getElementById('menuScreen')
+    menu: document.getElementById('menuScreen'),
+    reservation: document.getElementById('reservationScreen')
 };
 
 function showScreen(screenName) {
@@ -22,49 +20,472 @@ function showScreen(screenName) {
     
     if (screenName === 'dashboard') renderTables();
     if (screenName === 'menu') renderMenuAdminScreen();
+    if (screenName === 'reservation') renderReservationsScreen();
 }
-
-// --- LOGIN ---
-document.getElementById('loginBtn').addEventListener('click', () => {
-    const pin = document.getElementById('pinInput').value;
-    if (pin === SECRET_PIN) {
-        showScreen('dashboard');
-    } else {
-        document.getElementById('loginError').textContent = "PIN Errato";
-    }
-});
-
-document.getElementById('pinInput').addEventListener('keypress', (e) => {
-    if (e.key === 'Enter') {
-        document.getElementById('loginBtn').click();
-    }
-});
 
 // --- LISTENER DATI REALTIME ---
 db.onDataChange((data) => {
+    if (data) {
+        if (data.tables && !Array.isArray(data.tables)) data.tables = Object.values(data.tables);
+        if (data.tables) data.tables = data.tables.filter(t => t != null);
+
+        if (data.menu && !Array.isArray(data.menu)) data.menu = Object.values(data.menu);
+        if (data.menu) data.menu = data.menu.filter(t => t != null);
+
+        if (data.reservations && !Array.isArray(data.reservations)) data.reservations = Object.values(data.reservations);
+        if (data.reservations) data.reservations = data.reservations.filter(t => t != null);
+    }
+    
     globalData = data;
     if (screens.dashboard.classList.contains('active')) renderTables();
     if (screens.order.classList.contains('active') && activeTableId) renderOrderScreen();
     if (screens.admin && screens.admin.classList.contains('active')) renderAdminScreen();
     if (screens.menu && screens.menu.classList.contains('active')) renderMenuAdminScreen();
+    if (screens.reservation && screens.reservation.classList.contains('active')) renderReservationsScreen();
 });
 
 // --- DASHBOARD TAVOLI ---
-document.querySelectorAll('#dashboardScreen .tab').forEach(tab => {
-    tab.addEventListener('click', (e) => {
-        document.querySelectorAll('#dashboardScreen .tab').forEach(t => t.classList.remove('active'));
+document.querySelectorAll('#dashboardScreen .zone-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('#dashboardScreen .zone-btn').forEach(t => t.classList.remove('active'));
         e.target.classList.add('active');
         currentZone = e.target.dataset.zone;
         renderTables();
     });
 });
 
+document.getElementById('reservationFab').addEventListener('click', () => {
+    showScreen('reservation');
+});
+
+const backToDashboardFromReservationsBtn = document.getElementById('backToDashboardFromReservationsBtn');
+if(backToDashboardFromReservationsBtn) {
+    backToDashboardFromReservationsBtn.addEventListener('click', () => {
+        showScreen('dashboard');
+    });
+}
+
+function createReservationCard(res) {
+    let timeStr = "Orario non definito";
+    if (res.dateTime) {
+        const d = new Date(res.dateTime);
+        timeStr = d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    const card = document.createElement('div');
+    card.style.background = 'white';
+    card.style.borderRadius = '8px';
+    card.style.padding = '1rem';
+    card.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)';
+    card.style.display = 'flex';
+    card.style.justifyContent = 'space-between';
+    card.style.alignItems = 'center';
+    card.style.borderLeft = '4px solid var(--primary-color)';
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => {
+        openReservationActionModal(res);
+    });
+    
+    let assignedTableBadge = '';
+    if (res.assignedTableId) {
+        const t = globalData.tables ? globalData.tables.find(t => t.id == res.assignedTableId) : null;
+        if (t) {
+            assignedTableBadge = `<span style="background: #10B981; color: white; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">Tavolo ${t.number}</span>`;
+        }
+    }
+    
+    let detailsHtml = `
+        <div style="flex: 1; padding-right: 1rem;">
+            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                <h3 style="margin: 0; font-size: 1.1rem;">${res.customerName || 'Cliente anonimo'}</h3>
+                ${assignedTableBadge}
+            </div>
+            <div style="color: #64748B; font-size: 0.9rem; margin-bottom: 0.25rem;">👥 ${res.partySize || 2} persone</div>
+    `;
+    
+    if (res.phoneNumber && res.phoneNumber.trim() !== "") {
+        detailsHtml += `<div style="color: #64748B; font-size: 0.9rem; margin-bottom: 0.25rem;">📞 ${res.phoneNumber}</div>`;
+    }
+    
+    let badgesHtml = '';
+    if (res.extras && res.extras.length > 0) {
+        res.extras.forEach(extra => {
+            let icon = '';
+            if(extra === 'Cani') icon = '🐕 ';
+            if(extra === 'Seggiolone') icon = '🪑 ';
+            if(extra === 'Carrozzina') icon = '👶 ';
+            if(extra === 'Torta Compleanno') icon = '🎂 ';
+            badgesHtml += `<span style="display: inline-block; background: #F1F5F9; color: #475569; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; margin-right: 0.4rem; margin-bottom: 0.4rem;">${icon}${extra}</span>`;
+        });
+    }
+    if (res.menuType && res.menuType.trim() !== "") {
+        let icon = res.menuType === 'Menù di Carne' ? '🥩 ' : '🐟 ';
+        badgesHtml += `<span style="display: inline-block; background: #EFF6FF; color: #1D4ED8; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.8rem; margin-right: 0.4rem; margin-bottom: 0.4rem;">${icon}${res.menuType}</span>`;
+    }
+    
+    if (badgesHtml !== '') {
+        detailsHtml += `<div style="margin-top: 0.5rem;">${badgesHtml}</div>`;
+    }
+
+    if (res.notes && res.notes.trim() !== "") {
+        detailsHtml += `<div style="color: #64748B; font-size: 0.9rem; margin-top: 0.5rem;">📝 ${res.notes}</div>`;
+    }
+    
+    detailsHtml += `</div>`;
+    
+    const timeHtml = `
+        <div style="display: flex; flex-direction: column; align-items: flex-end; justify-content: center;">
+            <div style="font-size: 1.5rem; font-weight: bold; color: var(--primary-color);">
+                ${timeStr}
+            </div>
+        </div>
+    `;
+    
+    card.innerHTML = detailsHtml + timeHtml;
+    return card;
+}
+
+let currentReservationDate = new Date();
+
+function renderReservationsScreen() {
+    if (!globalData) return;
+    
+    const today = new Date();
+    const isToday = currentReservationDate.getDate() === today.getDate() && 
+                    currentReservationDate.getMonth() === today.getMonth() && 
+                    currentReservationDate.getFullYear() === today.getFullYear();
+    
+    let displayDate = currentReservationDate.toLocaleDateString('it-IT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    displayDate = displayDate.charAt(0).toUpperCase() + displayDate.slice(1);
+    
+    const displayEl = document.getElementById('currentResDateDisplay');
+    if (displayEl) {
+        displayEl.textContent = isToday ? "Oggi" : displayDate;
+    }
+    
+    const container = document.getElementById('reservationsListContainer');
+    if (!container) return;
+    container.innerHTML = '';
+    
+    let reservations = [];
+    if (globalData.reservations) {
+        if (Array.isArray(globalData.reservations)) {
+            reservations = globalData.reservations.filter(r => r != null);
+        } else {
+            reservations = Object.values(globalData.reservations).filter(r => r != null);
+        }
+    }
+    
+    reservations.sort((a, b) => (a.dateTime || 0) - (b.dateTime || 0));
+
+    const yyyy = currentReservationDate.getFullYear();
+    const mm = String(currentReservationDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(currentReservationDate.getDate()).padStart(2, '0');
+    const targetDateKey = `${yyyy}-${mm}-${dd}`;
+
+    const grouped = {
+        pranzo: [],
+        cena: []
+    };
+    
+    reservations.forEach(res => {
+        if (!res.dateTime) return;
+        const d = new Date(res.dateTime);
+        const r_yyyy = d.getFullYear();
+        const r_mm = String(d.getMonth() + 1).padStart(2, '0');
+        const r_dd = String(d.getDate()).padStart(2, '0');
+        const dateKey = `${r_yyyy}-${r_mm}-${r_dd}`;
+        
+        if (dateKey === targetDateKey) {
+            const hour = d.getHours();
+            if (hour < 16) {
+                grouped.pranzo.push(res);
+            } else {
+                grouped.cena.push(res);
+            }
+        }
+    });
+
+    if (grouped.pranzo.length === 0 && grouped.cena.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color: #666; margin-top: 2rem;">Nessuna prenotazione per questo giorno.</p>';
+        return;
+    }
+
+    if (grouped.pranzo.length > 0) {
+        const pranzoHeader = document.createElement('h3');
+        pranzoHeader.style.fontSize = '1.1rem';
+        pranzoHeader.style.color = '#D97706'; 
+        pranzoHeader.style.margin = '0 0 0.8rem 0';
+        pranzoHeader.innerHTML = '☀️ Servizio del Pranzo';
+        container.appendChild(pranzoHeader);
+        
+        const pranzoContainer = document.createElement('div');
+        pranzoContainer.style.display = 'flex';
+        pranzoContainer.style.flexDirection = 'column';
+        pranzoContainer.style.gap = '0.8rem';
+        pranzoContainer.style.marginBottom = '1.5rem';
+        
+        grouped.pranzo.forEach(res => {
+            pranzoContainer.appendChild(createReservationCard(res));
+        });
+        container.appendChild(pranzoContainer);
+    }
+
+    if (grouped.cena.length > 0) {
+        const cenaHeader = document.createElement('h3');
+        cenaHeader.style.fontSize = '1.1rem';
+        cenaHeader.style.color = '#2563EB'; 
+        cenaHeader.style.margin = '0 0 0.8rem 0';
+        cenaHeader.innerHTML = '🌙 Servizio della Cena';
+        container.appendChild(cenaHeader);
+        
+        const cenaContainer = document.createElement('div');
+        cenaContainer.style.display = 'flex';
+        cenaContainer.style.flexDirection = 'column';
+        cenaContainer.style.gap = '0.8rem';
+        
+        grouped.cena.forEach(res => {
+            cenaContainer.appendChild(createReservationCard(res));
+        });
+        container.appendChild(cenaContainer);
+    }
+}
+
+document.getElementById('prevResDateBtn').addEventListener('click', () => {
+    currentReservationDate.setDate(currentReservationDate.getDate() - 1);
+    renderReservationsScreen();
+});
+
+document.getElementById('nextResDateBtn').addEventListener('click', () => {
+    currentReservationDate.setDate(currentReservationDate.getDate() + 1);
+    renderReservationsScreen();
+});
+
+document.getElementById('openResCalendarBtn').addEventListener('click', () => {
+    const picker = document.getElementById('hiddenResDatePicker');
+    try {
+        if (typeof picker.showPicker === 'function') {
+            picker.showPicker();
+        } else {
+            picker.focus();
+        }
+    } catch (e) {
+        picker.focus();
+    }
+});
+
+document.getElementById('hiddenResDatePicker').addEventListener('change', (e) => {
+    if (e.target.value) {
+        const parts = e.target.value.split('-');
+        if (parts.length === 3) {
+            currentReservationDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            renderReservationsScreen();
+        }
+    }
+});
+
+document.getElementById('reservationScreenFab').addEventListener('click', () => {
+    document.getElementById('resCustomerName').value = '';
+    
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    document.getElementById('resDate').value = `${yyyy}-${mm}-${dd}`;
+    document.getElementById('resTime').value = '20:00';
+    
+    document.getElementById('resPartySize').value = 2;
+    document.getElementById('resPhone').value = '';
+    
+    document.getElementById('resExtraDog').checked = false;
+    document.getElementById('resExtraHighChair').checked = false;
+    document.getElementById('resExtraStroller').checked = false;
+    document.getElementById('resExtraCake').checked = false;
+    
+    document.getElementById('resMenuType').value = '';
+    document.getElementById('resNotes').value = '';
+    
+    document.getElementById('addReservationModal').style.display = 'flex';
+    setTimeout(() => { document.getElementById('resCustomerName').focus(); }, 50);
+});
+
+document.getElementById('cancelAddReservationBtn').addEventListener('click', () => {
+    document.getElementById('addReservationModal').style.display = 'none';
+});
+
+document.getElementById('confirmAddReservationBtn').addEventListener('click', () => {
+    const name = document.getElementById('resCustomerName').value.trim();
+    const date = document.getElementById('resDate').value;
+    const time = document.getElementById('resTime').value;
+    const partySize = parseInt(document.getElementById('resPartySize').value) || 2;
+    const phone = document.getElementById('resPhone').value.trim();
+    
+    if (!name) {
+        alert("Inserisci il nome del cliente.");
+        return;
+    }
+    if (!date || !time) {
+        alert("Inserisci giorno e orario della prenotazione.");
+        return;
+    }
+    
+    const dateTimeMs = new Date(`${date}T${time}`).getTime();
+    
+    const extras = [];
+    if (document.getElementById('resExtraDog').checked) extras.push('Cani');
+    if (document.getElementById('resExtraHighChair').checked) extras.push('Seggiolone');
+    if (document.getElementById('resExtraStroller').checked) extras.push('Carrozzina');
+    if (document.getElementById('resExtraCake').checked) extras.push('Torta Compleanno');
+    
+    const menuType = document.getElementById('resMenuType').value;
+    const notes = document.getElementById('resNotes').value.trim();
+    
+    if (!globalData.reservations) {
+        globalData.reservations = [];
+    } else if (!Array.isArray(globalData.reservations)) {
+        globalData.reservations = Object.values(globalData.reservations);
+    }
+    
+    const newId = globalData.reservations.length > 0 ? Math.max(...globalData.reservations.map(r => r.id || 0)) + 1 : 1;
+    
+    const newRes = {
+        id: newId,
+        customerName: name,
+        partySize: partySize,
+        dateTime: dateTimeMs,
+        phoneNumber: phone,
+        notes: notes,
+        extras: extras,
+        menuType: menuType
+    };
+    
+    globalData.reservations.push(newRes);
+    db.set(globalData);
+    
+    document.getElementById('addReservationModal').style.display = 'none';
+    renderReservationsScreen();
+});
+
+let pendingReservationActionId = null;
+
+function openReservationActionModal(res) {
+    pendingReservationActionId = res.id;
+    document.getElementById('resActionTitle').textContent = `Gestione: ${res.customerName}`;
+    
+    const select = document.getElementById('resAssignTableSelect');
+    select.innerHTML = '<option value="">Nessun tavolo</option>';
+    
+    if (globalData.tables) {
+        globalData.tables.filter(t => t.isActive).forEach(t => {
+            const opt = document.createElement('option');
+            opt.value = t.id;
+            const zoneName = t.zone === 'SALA_GRANDE' ? 'Sala G.' : (t.zone === 'SALA_PICCOLA' ? 'Sala P.' : 'Dehor');
+            opt.textContent = `Tavolo ${t.number} (${zoneName})`;
+            if (res.assignedTableId && String(res.assignedTableId) === String(t.id)) {
+                opt.selected = true;
+            }
+            select.appendChild(opt);
+        });
+    }
+    
+    document.getElementById('reservationActionModal').style.display = 'flex';
+}
+
+document.getElementById('closeResActionModalBtn').addEventListener('click', () => {
+    document.getElementById('reservationActionModal').style.display = 'none';
+    pendingReservationActionId = null;
+});
+
+document.getElementById('deleteReservationBtn').addEventListener('click', () => {
+    if (!pendingReservationActionId) return;
+    if (confirm("Sei sicuro di voler eliminare questa prenotazione?")) {
+        const resToDelete = globalData.reservations.find(r => r.id === pendingReservationActionId);
+        if (resToDelete && resToDelete.assignedTableId) {
+            const table = globalData.tables.find(t => t.id === resToDelete.assignedTableId);
+            if (table && table.status === 'PRENOTATO') {
+                table.status = 'LIBERO';
+                table.partySize = null;
+            }
+        }
+        
+        globalData.reservations = globalData.reservations.filter(r => r.id !== pendingReservationActionId);
+        db.set(globalData);
+        document.getElementById('reservationActionModal').style.display = 'none';
+        pendingReservationActionId = null;
+        renderReservationsScreen();
+    }
+});
+
+document.getElementById('confirmAssignTableBtn').addEventListener('click', () => {
+    if (!pendingReservationActionId) return;
+    const tableIdStr = document.getElementById('resAssignTableSelect').value;
+    
+    const index = globalData.reservations.findIndex(r => r.id === pendingReservationActionId);
+    if (index !== -1) {
+        const oldTableId = globalData.reservations[index].assignedTableId;
+        
+        if (tableIdStr === "") {
+            delete globalData.reservations[index].assignedTableId;
+            if (oldTableId) {
+                const oldT = globalData.tables.find(x => x.id === oldTableId);
+                if (oldT && oldT.status === 'PRENOTATO') {
+                    oldT.status = 'LIBERO';
+                    oldT.partySize = null;
+                }
+            }
+        } else {
+            const newTableId = parseInt(tableIdStr);
+            if (oldTableId && oldTableId !== newTableId) {
+                const oldT = globalData.tables.find(x => x.id === oldTableId);
+                if (oldT && oldT.status === 'PRENOTATO') {
+                    oldT.status = 'LIBERO';
+                    oldT.partySize = null;
+                }
+            }
+            
+            globalData.reservations[index].assignedTableId = newTableId;
+            const newT = globalData.tables.find(x => x.id === newTableId);
+            if (newT && (newT.status === 'LIBERO' || newT.status === 'PRENOTATO')) {
+                newT.status = 'PRENOTATO';
+                newT.partySize = globalData.reservations[index].partySize;
+            }
+        }
+        db.set(globalData);
+        renderReservationsScreen();
+    }
+    document.getElementById('reservationActionModal').style.display = 'none';
+    pendingReservationActionId = null;
+});
+
+let currentDashboardDate = new Date();
+let currentDashboardService = new Date().getHours() < 16 ? 'pranzo' : 'cena';
+
 function renderTables() {
     if (!globalData || !globalData.tables) return;
     const grid = document.getElementById('tablesGrid');
     grid.innerHTML = '';
     
-    // Mostra solo i tavoli ATTIVI per la zona corrente
+    const today = new Date();
+    const isToday = currentDashboardDate.getDate() === today.getDate() && 
+                    currentDashboardDate.getMonth() === today.getMonth() && 
+                    currentDashboardDate.getFullYear() === today.getFullYear();
+    
+    let displayDate = currentDashboardDate.toLocaleDateString('it-IT', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+    displayDate = displayDate.charAt(0).toUpperCase() + displayDate.slice(1);
+    
+    const displayEl = document.getElementById('currentDashDateDisplay');
+    if (displayEl) {
+        displayEl.textContent = isToday ? "Oggi" : displayDate;
+    }
+    
+    const realTimeService = today.getHours() < 16 ? 'pranzo' : 'cena';
+    const isLookingAtRealTime = isToday && currentDashboardService === realTimeService;
+    
+    const yyyy = currentDashboardDate.getFullYear();
+    const mm = String(currentDashboardDate.getMonth() + 1).padStart(2, '0');
+    const dd = String(currentDashboardDate.getDate()).padStart(2, '0');
+    const dashDateKey = `${yyyy}-${mm}-${dd}`;
+    
     const activeTablesInZone = globalData.tables.filter(t => t.zone === currentZone && t.isActive === true);
     
     if (activeTablesInZone.length === 0) {
@@ -73,16 +494,89 @@ function renderTables() {
     }
 
     activeTablesInZone.forEach(table => {
+        let displayStatus = 'LIBERO';
+        let displayPartySize = null;
+        
+        let hasReservation = false;
+        if (globalData.reservations) {
+            let resArray = Array.isArray(globalData.reservations) ? globalData.reservations : Object.values(globalData.reservations);
+            const assignedRes = resArray.find(r => {
+                if (!r || r.assignedTableId !== table.id || !r.dateTime) return false;
+                const d = new Date(r.dateTime);
+                const r_yyyy = d.getFullYear();
+                const r_mm = String(d.getMonth() + 1).padStart(2, '0');
+                const r_dd = String(d.getDate()).padStart(2, '0');
+                if (`${r_yyyy}-${r_mm}-${r_dd}` !== dashDateKey) return false;
+                
+                const hour = d.getHours();
+                const service = hour < 16 ? 'pranzo' : 'cena';
+                return service === currentDashboardService;
+            });
+            
+            if (assignedRes) {
+                displayStatus = 'PRENOTATO';
+                displayPartySize = assignedRes.partySize;
+                hasReservation = true;
+            }
+        }
+        
+        if (!hasReservation && isLookingAtRealTime && table.status === 'OCCUPATO') {
+            displayStatus = 'OCCUPATO';
+            displayPartySize = table.partySize;
+        }
+
         const card = document.createElement('div');
-        card.className = `table-card table-${table.status}`;
+        card.className = `table-card table-${displayStatus}`;
         card.innerHTML = `
             <span class="number">${table.number}</span>
-            <span class="status">${table.status}</span>
+            <span class="status">${displayStatus}</span>
         `;
-        card.addEventListener('click', () => openTable(table.id));
+        card.addEventListener('click', () => openTable(table.id, displayStatus, displayPartySize));
         grid.appendChild(card);
     });
 }
+
+document.getElementById('prevDashDateBtn')?.addEventListener('click', () => {
+    currentDashboardDate.setDate(currentDashboardDate.getDate() - 1);
+    renderTables();
+});
+document.getElementById('nextDashDateBtn')?.addEventListener('click', () => {
+    currentDashboardDate.setDate(currentDashboardDate.getDate() + 1);
+    renderTables();
+});
+document.getElementById('dashServicePranzoBtn')?.addEventListener('click', () => {
+    currentDashboardService = 'pranzo';
+    document.getElementById('dashServicePranzoBtn').classList.add('active');
+    document.getElementById('dashServiceCenaBtn').classList.remove('active');
+    renderTables();
+});
+document.getElementById('dashServiceCenaBtn')?.addEventListener('click', () => {
+    currentDashboardService = 'cena';
+    document.getElementById('dashServiceCenaBtn').classList.add('active');
+    document.getElementById('dashServicePranzoBtn').classList.remove('active');
+    renderTables();
+});
+document.getElementById('openDashCalendarBtn')?.addEventListener('click', () => {
+    const picker = document.getElementById('hiddenDashDatePicker');
+    try {
+        if (typeof picker.showPicker === 'function') {
+            picker.showPicker();
+        } else {
+            picker.focus();
+        }
+    } catch (e) {
+        picker.focus();
+    }
+});
+document.getElementById('hiddenDashDatePicker')?.addEventListener('change', (e) => {
+    if (e.target.value) {
+        const parts = e.target.value.split('-');
+        if (parts.length === 3) {
+            currentDashboardDate = new Date(parts[0], parts[1] - 1, parts[2]);
+            renderTables();
+        }
+    }
+});
 
 // --- GESTIONE IMPOSTAZIONI (ADMIN) ---
 const settingsBtn = document.getElementById('settingsBtn');
@@ -310,31 +804,27 @@ document.getElementById('confirmAddMenuItemBtn').addEventListener('click', () =>
 // --- APERTURA COMANDA TAVOLO ---
 let pendingTableId = null;
 
-function openTable(tableId) {
+function openTable(tableId, displayStatus, displayPartySize) {
     let table = globalData.tables.find(t => t.id === tableId);
     
-    if (table.status === 'LIBERO') {
+    const effectiveStatus = displayStatus !== undefined ? displayStatus : table.status;
+    const effectivePartySize = displayPartySize !== undefined ? displayPartySize : table.partySize;
+    
+    if (effectiveStatus === 'LIBERO') {
         pendingTableId = tableId;
+        document.getElementById('partySizeModalTitle').textContent = `Tavolo ${table.number} - Libero`;
         document.getElementById('partySizeInput').value = 2;
-        document.getElementById('partyArrivedCheckbox').checked = true; // Auto check for walk-ins
-        document.getElementById('partyArrivedCheckbox').parentElement.style.display = 'none'; // Hide it
+        document.getElementById('partyArrivedCheckbox').checked = false; // Default a solo prenotato
+        document.getElementById('partyArrivedLabelText').textContent = "Clienti NON prenotati (occupa subito)";
+        document.getElementById('cancelReservationInModalBtn').style.display = 'none';
         document.getElementById('partySizeModal').style.display = 'flex';
-    } else if (table.status === 'PRENOTATO') {
+    } else if (effectiveStatus === 'PRENOTATO') {
         pendingTableId = tableId;
-        if (!globalData.reservations) globalData.reservations = [];
-        const sortedRes = [...globalData.reservations].sort((a, b) => a.time.localeCompare(b.time));
-        const nextRes = sortedRes.find(r => r.tableId === tableId && r.status === 'PENDING');
-        
-        if (nextRes) {
-            document.getElementById('partySizeInput').value = nextRes.pax;
-            document.getElementById('partyArrivedLabelText').textContent = ` ${nextRes.name} (${nextRes.time}) è arrivato? (Occupa tavolo)`;
-        } else {
-            document.getElementById('partySizeInput').value = 2;
-            document.getElementById('partyArrivedLabelText').textContent = ' Occupare tavolo?';
-        }
-        document.getElementById('partyArrivedCheckbox').checked = false;
-        document.getElementById('partyArrivedCheckbox').parentElement.style.display = 'block'; 
-        
+        document.getElementById('partySizeModalTitle').textContent = `Tavolo ${table.number} - Prenotato`;
+        document.getElementById('partySizeInput').value = effectivePartySize || 2;
+        document.getElementById('partyArrivedCheckbox').checked = true; // Default a arrivati
+        document.getElementById('partyArrivedLabelText').textContent = "I clienti sono arrivati (occupa)";
+        document.getElementById('cancelReservationInModalBtn').style.display = 'block';
         document.getElementById('partySizeModal').style.display = 'flex';
     } else {
         // OCCUPATO
@@ -344,36 +834,67 @@ function openTable(tableId) {
     }
 }
 
-// Gestione popup numero coperti
+// Gestione popup numero coperti (unico per Prenotare/Occupare)
 document.getElementById('cancelPartySizeBtn').addEventListener('click', () => {
+    document.getElementById('partySizeModal').style.display = 'none';
+    pendingTableId = null;
+});
+
+document.getElementById('cancelReservationInModalBtn').addEventListener('click', () => {
+    if (pendingTableId) {
+        let table = globalData.tables.find(t => t.id === pendingTableId);
+        
+        if (table.status === 'OCCUPATO') {
+            table.status = 'LIBERO';
+            table.partySize = null;
+        }
+        
+        if (globalData.reservations) {
+            const yyyy = currentDashboardDate.getFullYear();
+            const mm = String(currentDashboardDate.getMonth() + 1).padStart(2, '0');
+            const dd = String(currentDashboardDate.getDate()).padStart(2, '0');
+            const dashDateKey = `${yyyy}-${mm}-${dd}`;
+            
+            let resArray = Array.isArray(globalData.reservations) ? globalData.reservations : Object.values(globalData.reservations);
+            resArray.forEach(r => {
+                if (r && r.assignedTableId === pendingTableId && r.dateTime) {
+                    const d = new Date(r.dateTime);
+                    const r_yyyy = d.getFullYear();
+                    const r_mm = String(d.getMonth() + 1).padStart(2, '0');
+                    const r_dd = String(d.getDate()).padStart(2, '0');
+                    if (`${r_yyyy}-${r_mm}-${r_dd}` === dashDateKey) {
+                        const hour = d.getHours();
+                        const service = hour < 16 ? 'pranzo' : 'cena';
+                        if (service === currentDashboardService) {
+                            delete r.assignedTableId;
+                        }
+                    }
+                }
+            });
+        }
+        
+        db.set(globalData);
+        renderTables();
+    }
     document.getElementById('partySizeModal').style.display = 'none';
     pendingTableId = null;
 });
 
 document.getElementById('confirmPartySizeBtn').addEventListener('click', () => {
     const partySize = parseInt(document.getElementById('partySizeInput').value) || 2;
-    const isArrived = document.getElementById('partyArrivedCheckbox').checked;
+    const occupyImmediately = document.getElementById('partyArrivedCheckbox').checked;
+    
     document.getElementById('partySizeModal').style.display = 'none';
     
     if (pendingTableId) {
         let table = globalData.tables.find(t => t.id === pendingTableId);
         
-        if (!globalData.orders) globalData.orders = {};
-        if (!globalData.orders[pendingTableId]) {
-            globalData.orders[pendingTableId] = { partySize: partySize, items: [] };
-        } else {
-            globalData.orders[pendingTableId].partySize = partySize;
-        }
-
-        if (isArrived) {
+        if (occupyImmediately) {
             table.status = 'OCCUPATO';
+            table.partySize = null; // pulizia per non sporcare i dati del tavolo
             
-            if (!globalData.reservations) globalData.reservations = [];
-            const sortedRes = [...globalData.reservations].sort((a, b) => a.time.localeCompare(b.time));
-            const nextRes = sortedRes.find(r => r.tableId === pendingTableId && r.status === 'PENDING');
-            if (nextRes) {
-                nextRes.status = 'SEATED';
-            }
+            if (!globalData.orders) globalData.orders = {};
+            globalData.orders[pendingTableId] = { partySize: partySize, items: [] };
             
             db.set(globalData);
             activeTableId = pendingTableId;
@@ -381,6 +902,20 @@ document.getElementById('confirmPartySizeBtn').addEventListener('click', () => {
             showScreen('order');
             renderOrderScreen();
         } else {
+            // "Prenota ora"
+            const newRes = {
+                id: globalData.reservations ? (globalData.reservations.length > 0 ? Math.max(...globalData.reservations.map(r => r.id || 0)) + 1 : 1) : 1,
+                customerName: "Prenotazione Rapida (Dashboard)",
+                partySize: partySize,
+                dateTime: new Date(currentDashboardDate).setHours(currentDashboardService === 'pranzo' ? 12 : 20, 0, 0, 0),
+                assignedTableId: pendingTableId
+            };
+            if (!globalData.reservations) globalData.reservations = [];
+            if (!Array.isArray(globalData.reservations)) globalData.reservations = Object.values(globalData.reservations);
+            globalData.reservations.push(newRes);
+            
+            db.set(globalData);
+            renderTables();
             pendingTableId = null;
         }
     }
@@ -701,7 +1236,6 @@ function handleAddBtnClick(menuItemId) {
     }
 
     // Pizze: Cottura Pizza e Bordo
-    const isPizza = ['Pizze rosse', 'Pizze bianche', 'Pizze al tegamino', 'Pizze Baby'].includes(cat);
     if (isPizza) {
         document.getElementById('pizzaCookingSection').style.display = 'block';
         document.getElementById('pizzaEdgeSection').style.display = 'block';
@@ -713,7 +1247,6 @@ function handleAddBtnClick(menuItemId) {
     }
 
     // Ingredienti Extra: Pizze, Focacce, Hamburger, Panuozzi, Calzoni
-    const allowsExtra = isPizza || ['Focacce', 'Hamburger', 'Panuozzi', 'Calzoni'].includes(cat);
     if (allowsExtra) {
         document.getElementById('extraIngredientsSection').style.display = 'block';
     } else {
@@ -869,12 +1402,7 @@ function addMenuItemToOrder(menuItemId, variantsText = [], extraPrice = 0) {
 // --- CHIUSURA CONTO ---
 document.getElementById('closeOrderBtn').addEventListener('click', () => {
     let table = globalData.tables.find(t => t.id === activeTableId);
-    
-    if(!globalData.reservations) globalData.reservations = [];
-    const hasNext = globalData.reservations.some(r => r.tableId === table.id && r.status === 'PENDING');
-    
-    table.status = hasNext ? 'PRENOTATO' : 'LIBERO';
-    
+    table.status = 'LIBERO'; // Libera il tavolo
     delete globalData.orders[activeTableId]; // Elimina l'ordine chiuso
     db.set(globalData);
     
@@ -882,119 +1410,8 @@ document.getElementById('closeOrderBtn').addEventListener('click', () => {
     renderTables();
 });
 
-// --- GESTIONE PRENOTAZIONI AVANZATA ---
-if (!globalData.reservations) globalData.reservations = [];
-
-function renderReservations() {
-    if (!globalData.reservations) globalData.reservations = [];
-    const list = document.getElementById('reservationsList');
-    if(!list) return;
-    list.innerHTML = '';
-    
-    const sorted = [...globalData.reservations].sort((a, b) => a.time.localeCompare(b.time));
-    
-    if (sorted.length === 0) {
-        list.innerHTML = '<p style="color:var(--text-secondary); text-align:center;">Nessuna prenotazione presente.</p>';
-        return;
-    }
-    
-    sorted.forEach(res => {
-        const table = globalData.tables.find(t => t.id === res.tableId);
-        const tableNome = table ? `Tavolo ${table.number}` : `Tavolo N/D`;
-        
-        const card = document.createElement('div');
-        card.className = `reservation-card ${res.status === 'SEATED' ? 'seated' : ''}`;
-        
-        card.innerHTML = `
-            <div class="reservation-header">
-                <span>🕒 ${res.time} - 👤 ${res.name}</span>
-                <span>${tableNome}</span>
-            </div>
-            <div class="reservation-details">
-                <span>📞 ${res.phone || 'Nessun numero'} | 👥 ${res.pax} persone</span>
-                <span style="color: ${res.status === 'SEATED' ? 'var(--success-color)' : 'var(--warning-color)'}; font-weight: bold;">
-                    ${res.status === 'SEATED' ? 'Arrivato e Seduto' : 'In attesa'}
-                </span>
-            </div>
-        `;
-        list.appendChild(card);
-    });
-}
-
-document.getElementById('viewReservationsBtn').addEventListener('click', () => {
-    showScreen('reservations');
-    renderReservations();
-});
-
-document.getElementById('backToDashboardFromResBtn').addEventListener('click', () => {
-    showScreen('dashboard');
-    renderTables();
-});
-
-document.getElementById('addReservationBtn').addEventListener('click', () => {
-    const select = document.getElementById('resTableSelect');
-    if(select) {
-        select.innerHTML = '';
-        globalData.tables.filter(t => t.active).forEach(t => {
-            const opt = document.createElement('option');
-            opt.value = t.id;
-            opt.textContent = `Tavolo ${t.number}`;
-            select.appendChild(opt);
-        });
-    }
-    
-    document.getElementById('resTimeInput').value = '20:00';
-    document.getElementById('resNameInput').value = '';
-    document.getElementById('resPhoneInput').value = '';
-    document.getElementById('resPaxInput').value = '2';
-    
-    document.getElementById('reservationFormModal').style.display = 'flex';
-});
-
-document.getElementById('cancelResBtn').addEventListener('click', () => {
-    document.getElementById('reservationFormModal').style.display = 'none';
-});
-
-document.getElementById('saveResBtn').addEventListener('click', () => {
-    const time = document.getElementById('resTimeInput').value;
-    const name = document.getElementById('resNameInput').value.trim();
-    const phone = document.getElementById('resPhoneInput').value.trim();
-    const pax = parseInt(document.getElementById('resPaxInput').value) || 2;
-    const tableId = parseInt(document.getElementById('resTableSelect').value);
-    
-    if (!time || !name) {
-        alert("Inserisci orario e nome del cliente.");
-        return;
-    }
-    
-    if (!globalData.reservations) globalData.reservations = [];
-    
-    globalData.reservations.push({
-        id: Date.now(),
-        time,
-        name,
-        phone,
-        pax,
-        tableId,
-        status: 'PENDING'
-    });
-    
-    const table = globalData.tables.find(t => t.id === tableId);
-    if (table && table.status === 'LIBERO') {
-        table.status = 'PRENOTATO';
-    }
-    
-    db.set(globalData);
-    document.getElementById('reservationFormModal').style.display = 'none';
-    renderReservations();
-});
-
 // --- NAVIGAZIONE BACK ---
 document.getElementById('backToDashboardBtn').addEventListener('click', () => {
     activeTableId = null;
     showScreen('dashboard');
-});
-
-document.getElementById('logoutBtn').addEventListener('click', () => {
-    showScreen('login');
 });

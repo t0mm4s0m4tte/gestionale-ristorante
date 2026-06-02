@@ -5,43 +5,54 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Restaurant Web App</title>
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Schermata di Login / PIN -->
-    <div id="loginScreen" class="screen active">
-        <div class="login-container">
-            <h1>Accesso Riservato</h1>
-            <p>Inserisci il PIN per accedere all'app del ristorante.</p>
-            <input type="password" id="pinInput" placeholder="PIN" maxlength="4" />
-            <button id="loginBtn" class="btn primary">Entra</button>
-            <p id="loginError" class="error-msg"></p>
-        </div>
-    </div>
-
-    <!-- Schermata Principale (Dashboard Tavoli) -->
-    <div id="dashboardScreen" class="screen">
+    <!-- Schermata Mappa Tavoli (Dashboard) -->
+    <div id="dashboardScreen" class="screen active">
         <header>
             <h1>Gestione Tavoli</h1>
             <div style="display:flex; gap:10px;">
                 <button id="manageMenuBtn" class="btn secondary small">Menù</button>
                 <button id="settingsBtn" class="btn icon">⚙️</button>
-                <button id="logoutBtn" class="btn secondary small">Esci</button>
             </div>
         </header>
 
-        <div class="tabs">
-            <button class="tab active" data-zone="SALA_GRANDE">Sala Grande</button>
-            <button class="tab" data-zone="SALA_PICCOLA">Sala Piccola</button>
-            <button class="tab" data-zone="DEHOR">Dehor</button>
+        <!-- Barra Navigazione Data e Servizio per la Dashboard -->
+        <div class="dashboard-toolbar">
+            <div class="date-navigator">
+                <button id="prevDashDateBtn" class="btn icon">&lt;</button>
+                <div class="date-display">
+                    <h3 id="currentDashDateDisplay">Oggi</h3>
+                    <div class="calendar-wrapper">
+                        <button id="openDashCalendarBtn" class="btn icon calendar-icon">📅</button>
+                        <input type="date" id="hiddenDashDatePicker" class="hidden-datepicker" />
+                    </div>
+                </div>
+                <button id="nextDashDateBtn" class="btn icon">&gt;</button>
+            </div>
+            
+            <div class="segmented-control service-toggle">
+                <button id="dashServicePranzoBtn" class="segment-btn active">☀️ Pranzo</button>
+                <button id="dashServiceCenaBtn" class="segment-btn">🌙 Cena</button>
+            </div>
+        </div>
+
+        <!-- Selezione Zona -->
+        <div class="zone-selector tabs" id="zoneSelector">
+            <button class="zone-btn tab active" data-zone="SALA_GRANDE">Sala Grande</button>
+            <button class="zone-btn tab" data-zone="SALA_PICCOLA">Sala Piccola</button>
+            <button class="zone-btn tab" data-zone="DEHOR">Dehor</button>
         </div>
 
         <div id="tablesGrid" class="tables-grid">
             <!-- I tavoli verranno generati dinamicamente qui -->
         </div>
-        
-        <button id="viewReservationsBtn" class="btn fab">Prenotazioni</button>
+
+        <button id="reservationFab" class="btn" style="position: fixed; bottom: 20px; right: 20px; border-radius: 50px; display: flex; align-items: center; gap: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 100; font-size: 14px; padding: 10px 16px; background: var(--primary-color); color: white; width: max-content;">
+            📅 Prenotazioni
+        </button>
     </div>
 
     <!-- Schermata della Comanda (Ordine) -->
@@ -74,18 +85,6 @@
         </div>
     </div>
 
-    <!-- Schermata Prenotazioni -->
-    <div id="reservationsScreen" class="screen">
-         <header>
-            <button id="backToDashboardFromResBtn" class="btn icon">←</button>
-            <h1>Prenotazioni</h1>
-            <button id="addReservationBtn" class="btn primary small">+ Nuova</button>
-        </header>
-        <div id="reservationsList" class="reservations-list">
-             <!-- Prenotazioni dinamiche -->
-        </div>
-    </div>
-
     <!-- Schermata Admin / Impostazioni Tavoli -->
     <div id="adminScreen" class="screen">
         <header>
@@ -97,6 +96,35 @@
             <p>Seleziona i tavoli che desideri attivare per questo servizio. Solo i tavoli selezionati appariranno nella dashboard principale.</p>
             <div id="adminTablesContainer">
                 <!-- Generati dinamicamente -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Schermata Prenotazioni -->
+    <div id="reservationScreen" class="screen">
+        <header>
+            <button id="backToDashboardFromReservationsBtn" class="btn icon">←</button>
+            <h1>Agenda Prenotazioni</h1>
+            <div class="header-spacer"></div>
+        </header>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; padding: 1rem; background: white; border-bottom: 1px solid #E2E8F0; position: sticky; top: 0; z-index: 50;">
+            <button id="prevResDateBtn" class="btn icon" style="font-size: 1.5rem; background: none; color: #64748B;">&lt;</button>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <h3 id="currentResDateDisplay" style="margin: 0; font-size: 1.1rem; color: #1E293B;">Oggi</h3>
+                <div style="position: relative;">
+                    <button id="openResCalendarBtn" class="btn icon" style="background: none; color: var(--primary-color);">📅</button>
+                    <input type="date" id="hiddenResDatePicker" style="position: absolute; opacity: 0; width: 0; height: 0; top: 0; left: 0;" />
+                </div>
+            </div>
+            <button id="nextResDateBtn" class="btn icon" style="font-size: 1.5rem; background: none; color: #64748B;">&gt;</button>
+        </div>
+
+        <button id="reservationScreenFab" class="btn primary" style="position: fixed; bottom: 20px; right: 20px; border-radius: 50%; width: 60px; height: 60px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); z-index: 100; font-size: 32px; padding: 0; padding-bottom: 4px; line-height: 1;">+</button>
+
+        <div class="reservations-content" style="padding: 1rem; padding-bottom: 100px;">
+            <div id="reservationsListContainer" style="display: flex; flex-direction: column; gap: 1rem;">
+                <!-- Prenotazioni generate dinamicamente -->
             </div>
         </div>
     </div>
@@ -118,22 +146,23 @@
         </div>
     </div>
 
-    <!-- Modal Numero Coperti -->
+    <!-- Modal Numero Coperti / Azione Tavolo -->
     <div id="partySizeModal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <h3>Quante persone?</h3>
-            <p>Inserisci il numero di coperti per questo tavolo.</p>
+            <h3 id="partySizeModalTitle">Apertura Tavolo</h3>
+            <p>Inserisci il numero di persone:</p>
             <input type="number" id="partySizeInput" min="1" max="20" value="2" />
             <div style="margin-top: 1rem; text-align: left;">
                 <label style="display: flex; align-items: center; gap: 0.5rem; font-size: 1rem; cursor: pointer;">
                     <input type="checkbox" id="partyArrivedCheckbox" style="width: 20px; height: 20px;" />
-                    <span id="partyArrivedLabelText">I clienti sono arrivati</span>
+                    <span id="partyArrivedLabelText">Clienti arrivati (occupa subito)</span>
                 </label>
             </div>
             <div style="display:flex; gap:10px; margin-top:1rem;">
                 <button id="cancelPartySizeBtn" class="btn secondary full-width">Annulla</button>
                 <button id="confirmPartySizeBtn" class="btn primary full-width">Conferma</button>
             </div>
+            <button id="cancelReservationInModalBtn" class="btn danger full-width" style="display: none; margin-top: 10px;">Libera Tavolo (Annulla Prenotazione)</button>
         </div>
     </div>
 
@@ -250,39 +279,109 @@
         </div>
     </div>
 
+
+
     <!-- Modal Nuova Prenotazione -->
-    <div id="reservationFormModal" class="modal-overlay" style="display:none;">
-        <div class="modal-content" style="max-width: 400px; text-align: left;">
+    <div id="addReservationModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 450px;">
             <h3 style="margin-bottom:1rem; color:var(--primary-color);">Nuova Prenotazione</h3>
             
-            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Orario</label>
-            <input type="time" id="resTimeInput" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.8rem;">
+                <input type="text" id="resCustomerName" placeholder="Nome Cliente (es. Mario Rossi)" />
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+                    <div>
+                        <label style="font-size: 0.85rem; color: #64748B;">Giorno</label>
+                        <input type="date" id="resDate" />
+                    </div>
+                    <div>
+                        <label style="font-size: 0.85rem; color: #64748B;">Orario</label>
+                        <input type="time" id="resTime" />
+                    </div>
+                </div>
 
-            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Nome Cliente</label>
-            <input type="text" id="resNameInput" placeholder="es. Mario Rossi" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+                <div>
+                    <label style="font-size: 0.85rem; color: #64748B;">Numero Persone</label>
+                    <input type="number" id="resPartySize" min="1" max="50" value="2" />
+                </div>
+                
+                <div>
+                    <label style="font-size: 0.85rem; color: #64748B;">Telefono (opzionale)</label>
+                    <input type="tel" id="resPhone" placeholder="es. 333 1234567" />
+                </div>
+            </div>
 
-            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Telefono</label>
-            <input type="tel" id="resPhoneInput" placeholder="es. 3331234567" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+            <div style="margin-top: 1.5rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem; color: #334155;">Extra</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="resExtraDog" style="width: 1.2rem; height: 1.2rem;"> Cani
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="resExtraHighChair" style="width: 1.2rem; height: 1.2rem;"> Seggiolone
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="resExtraStroller" style="width: 1.2rem; height: 1.2rem;"> Carrozzina
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="checkbox" id="resExtraCake" style="width: 1.2rem; height: 1.2rem;"> Torta Compleanno
+                    </label>
+                </div>
+            </div>
 
-            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Coperti</label>
-            <input type="number" id="resPaxInput" value="2" min="1" style="width: 100%; padding: 0.8rem; margin-bottom: 1rem; border-radius: 8px; border: 1px solid #CBD5E1;">
+            <div style="margin-top: 1.5rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem; color: #334155;">Tipologia Menù (opzionale)</h4>
+                <select id="resMenuType" style="width: 100%; padding: 0.8rem; border: 1px solid #CBD5E1; border-radius: 8px;">
+                    <option value="">Nessuna preferenza / Alla carta</option>
+                    <option value="Menù di Carne">Menù di Carne</option>
+                    <option value="Menù di Pesce">Menù di Pesce</option>
+                </select>
+            </div>
 
-            <label style="display:block; margin-bottom: 0.5rem; font-weight: 600;">Tavolo Assegnato</label>
-            <select id="resTableSelect" style="width: 100%; padding: 0.8rem; margin-bottom: 1.5rem; border-radius: 8px; border: 1px solid #CBD5E1; background: white;">
-                <!-- Popolato dinamicamente -->
-            </select>
+            <div style="margin-top: 1rem;">
+                <h4 style="margin-bottom: 0.5rem; font-size: 1rem; color: #334155;">Note aggiuntive</h4>
+                <textarea id="resNotes" rows="2" style="width: 100%; padding: 0.8rem; border: 1px solid #CBD5E1; border-radius: 8px; resize: vertical;" placeholder="Intolleranze, allergie, richieste particolari..."></textarea>
+            </div>
 
-            <div style="display:flex; gap:10px;">
-                <button id="cancelResBtn" class="btn secondary full-width">Annulla</button>
-                <button id="saveResBtn" class="btn primary full-width">Salva</button>
+            <div style="display:flex; gap:10px; margin-top:1.5rem;">
+                <button id="cancelAddReservationBtn" class="btn secondary full-width">Annulla</button>
+                <button id="confirmAddReservationBtn" class="btn primary full-width">Salva Prenotazione</button>
             </div>
         </div>
     </div>
 
+
+
+    <!-- Modal Azioni Prenotazione -->
+    <div id="reservationActionModal" class="modal-overlay" style="display: none;">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 id="resActionTitle" style="margin-bottom:1rem; color:var(--primary-color);">Gestione Prenotazione</h3>
+            
+            <div style="margin-bottom: 1.5rem;">
+                <label style="font-size: 0.9rem; color: #64748B;">Assegna a un Tavolo:</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <select id="resAssignTableSelect" style="flex: 1; padding: 0.8rem; border: 1px solid #CBD5E1; border-radius: 8px;">
+                        <option value="">Nessun tavolo</option>
+                    </select>
+                </div>
+                <button id="confirmAssignTableBtn" class="btn primary full-width">Salva Assegnazione</button>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #E2E8F0; margin: 1.5rem 0;" />
+
+            <div style="display:flex; flex-direction: column; gap:10px;">
+                <button id="deleteReservationBtn" class="btn danger full-width">Elimina Prenotazione</button>
+                <button id="closeResActionModalBtn" class="btn secondary full-width">Annulla</button>
+            </div>
+        </div>
+    </div>
+
+
+
     <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <script src="firebase-config.js"></script>
-    <script src="app.js"></script>
+    <script src="firebase-config.js?v=2"></script>
+    <script src="app.js?v=2"></script>
 </body>
 </html>
