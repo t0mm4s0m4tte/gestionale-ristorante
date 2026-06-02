@@ -41,7 +41,7 @@ Il codice sorgente principale si trova sotto `app/src/main/java/com/example/rest
 
 2. **Clona il repository**:
    ```bash
-   git clone <URL_DEL_REPO>
+   git clone https://github.com/t0mm4s0m4tte/gestionale-ristorante.git
    ```
 
 3. **Configurazione Firebase**:
@@ -52,7 +52,3 @@ Il codice sorgente principale si trova sotto `app/src/main/java/com/example/rest
    - Apri il progetto in Android Studio.
    - Attendi il completamento del Gradle Sync.
    - Avvia l'app su un emulatore (API livello 24 o superiore) o su un dispositivo fisico.
-
-## 📝 Licenza
-
-[Inserire qui il tipo di licenza, es. MIT License]
