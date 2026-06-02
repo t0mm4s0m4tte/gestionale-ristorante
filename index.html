@@ -6,7 +6,7 @@
     <title>Restaurant Web App</title>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
     <!-- Schermata Mappa Tavoli (Dashboard) -->
@@ -358,13 +358,18 @@
             <h3 id="resActionTitle" style="margin-bottom:1rem; color:var(--primary-color);">Gestione Prenotazione</h3>
             
             <div style="margin-bottom: 1.5rem;">
+                <label style="font-size: 0.9rem; color: #64748B;">Numero Persone:</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem;">
+                    <input type="number" id="resActionPartySize" style="flex: 1; padding: 0.8rem; border: 1px solid #CBD5E1; border-radius: 8px;" min="1" max="50" />
+                </div>
+
                 <label style="font-size: 0.9rem; color: #64748B;">Assegna a un Tavolo:</label>
                 <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
                     <select id="resAssignTableSelect" style="flex: 1; padding: 0.8rem; border: 1px solid #CBD5E1; border-radius: 8px;">
                         <option value="">Nessun tavolo</option>
                     </select>
                 </div>
-                <button id="confirmAssignTableBtn" class="btn primary full-width">Salva Assegnazione</button>
+                <button id="confirmAssignTableBtn" class="btn primary full-width">Salva Modifiche</button>
             </div>
 
             <hr style="border: 0; border-top: 1px solid #E2E8F0; margin: 1.5rem 0;" />
@@ -381,7 +386,7 @@
     <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
-    <script src="firebase-config.js?v=3?v=2"></script>
-    <script src="app.js?v=3?v=2"></script>
+    <script src="firebase-config.js?v=4?v=2"></script>
+    <script src="app.js?v=4?v=2"></script>
 </body>
 </html>

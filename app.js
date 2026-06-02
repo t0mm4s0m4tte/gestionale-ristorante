@@ -371,6 +371,7 @@ let pendingReservationActionId = null;
 function openReservationActionModal(res) {
     pendingReservationActionId = res.id;
     document.getElementById('resActionTitle').textContent = `Gestione: ${res.customerName}`;
+    document.getElementById('resActionPartySize').value = res.partySize || 2;
     
     const select = document.getElementById('resAssignTableSelect');
     select.innerHTML = '<option value="">Nessun tavolo</option>';
@@ -419,9 +420,11 @@ document.getElementById('deleteReservationBtn').addEventListener('click', () => 
 document.getElementById('confirmAssignTableBtn').addEventListener('click', () => {
     if (!pendingReservationActionId) return;
     const tableIdStr = document.getElementById('resAssignTableSelect').value;
+    const newPartySize = parseInt(document.getElementById('resActionPartySize').value) || 2;
     
     const index = globalData.reservations.findIndex(r => r.id === pendingReservationActionId);
     if (index !== -1) {
+        globalData.reservations[index].partySize = newPartySize;
         const oldTableId = globalData.reservations[index].assignedTableId;
         
         if (tableIdStr === "") {
@@ -447,7 +450,7 @@ document.getElementById('confirmAssignTableBtn').addEventListener('click', () =>
             const newT = globalData.tables.find(x => x.id === newTableId);
             if (newT && (newT.status === 'LIBERO' || newT.status === 'PRENOTATO')) {
                 newT.status = 'PRENOTATO';
-                newT.partySize = globalData.reservations[index].partySize;
+                newT.partySize = newPartySize;
             }
         }
         db.set(globalData);
